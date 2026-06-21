@@ -14,7 +14,6 @@
     "@livekit/components-styles": "^1.2.0",
     "livekit-client": "^2.19.2",
     "lucide-react": "^0.379.0",
-    "meet-app-root": "file:..",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.8.3"
