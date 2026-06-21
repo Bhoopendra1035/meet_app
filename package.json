@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "description": "Full stack LiveKit Meeting App",
   "scripts": {
-    "install": "cd server && npm install && cd ../client && npm install --legacy-peer-deps",
-    "build": "cd client && npm run build",
-    "start": "cd server && node server.js"
+    "build": "npm --prefix server install && npm --prefix client install && npm --prefix client run build",
+    "start": "npm --prefix server start"
   },
   "engines": {
     "node": ">=18.0.0"
