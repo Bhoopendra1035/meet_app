@@ -8,6 +8,7 @@ import {
 import '@livekit/components-styles';
 import ReactionsOverlay from './ReactionsOverlay';
 import ReactionsControls from './ReactionsControls';
+import ParticipantsSidebar from './ParticipantsSidebar';
 import { UserSession } from '../App';
 
 interface MeetingRoomProps {
@@ -29,6 +30,7 @@ export default function MeetingRoom({ roomId, user, isHost, onLeave }: MeetingRo
   const [error, setError] = useState('');
   const [waitingStatus, setWaitingStatus] = useState<'pending' | 'admitted' | 'denied' | null>(null);
   const [joinReqId, setJoinReqId] = useState<string | null>(null);
+  const [showParticipants, setShowParticipants] = useState(false);
 
   // Waiting List for Host
   const [waitingList, setWaitingList] = useState<{reqId: string, username: string}[]>([]);
@@ -228,7 +230,14 @@ export default function MeetingRoom({ roomId, user, isHost, onLeave }: MeetingRo
         <VideoConference />
         <RoomAudioRenderer />
         <ReactionsOverlay />
-        <ReactionsControls />
+        <ReactionsControls 
+          showParticipants={showParticipants} 
+          onToggleParticipants={() => setShowParticipants(prev => !prev)} 
+        />
+        <ParticipantsSidebar 
+          isOpen={showParticipants} 
+          onClose={() => setShowParticipants(false)} 
+        />
       </LiveKitRoom>
     </div>
   );

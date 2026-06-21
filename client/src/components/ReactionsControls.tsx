@@ -1,8 +1,13 @@
 import { useState, useCallback } from 'react';
 import { useDataChannel, useLocalParticipant } from '@livekit/components-react';
-import { SmilePlus, Hand } from 'lucide-react';
+import { SmilePlus, Hand, Users } from 'lucide-react';
 
-export default function ReactionsControls() {
+interface Props {
+  showParticipants: boolean;
+  onToggleParticipants: () => void;
+}
+
+export default function ReactionsControls({ showParticipants, onToggleParticipants }: Props) {
   const { send } = useDataChannel('reactions');
   const { localParticipant } = useLocalParticipant();
   const [showEmojis, setShowEmojis] = useState(false);
@@ -150,6 +155,30 @@ export default function ReactionsControls() {
         title={handRaised ? "Lower Hand" : "Raise Hand"}
       >
         <Hand size={22} />
+      </button>
+
+      {/* Participants */}
+      <button 
+        onClick={onToggleParticipants}
+        style={{ 
+          background: showParticipants ? 'linear-gradient(135deg, #8E2DE2, #4A00E0)' : 'transparent', 
+          color: showParticipants ? 'white' : 'rgba(255,255,255,0.8)',
+          border: 'none',
+          borderRadius: '50%',
+          width: '44px',
+          height: '44px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease',
+          boxShadow: showParticipants ? '0 4px 15px rgba(142, 45, 226, 0.4)' : 'none'
+        }}
+        onMouseOver={(e) => { if(!showParticipants) e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+        onMouseOut={(e) => { if(!showParticipants) e.currentTarget.style.background = 'transparent' }}
+        title="Participants"
+      >
+        <Users size={22} />
       </button>
 
       <style>
