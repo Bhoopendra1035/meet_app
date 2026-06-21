@@ -40,6 +40,7 @@ const generateLiveKitToken = async (room, username) => {
     room: room,
     canPublish: true,
     canSubscribe: true,
+    canPublishData: true,
   });
 
   const token = await at.toJwt();
