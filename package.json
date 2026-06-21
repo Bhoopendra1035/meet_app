@@ -1,14 +1,13 @@
 {
-  "name": "meet-app-root",
+  "name": "meet-app-deployment",
   "version": "1.0.0",
-  "description": "Root configuration for Google Meet clone",
+  "description": "Full stack LiveKit Meeting App",
   "scripts": {
-    "install-all": "npm install --prefix server && npm install --prefix client",
-    "start-server": "npm start --prefix server",
-    "start-client": "npm run dev --prefix client",
-    "dev": "npx concurrently \"npm run start-server\" \"npm run start-client\""
+    "install": "cd server && npm install && cd ../client && npm install --legacy-peer-deps",
+    "build": "cd client && npm run build",
+    "start": "cd server && node server.js"
   },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
