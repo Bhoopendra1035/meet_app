@@ -1,13 +1,14 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const http = require('http');
-const path = require('path');
-const { Server } = require('socket.io');
 const cors = require('cors');
 const { AccessToken } = require('livekit-server-sdk');
 
 const app = express();
 app.use(cors());
+
+app.use(express.json());
 
 // Serve static frontend client build files
 app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -17,197 +18,155 @@ app.get('/health', (req, res) => {
   res.send('Signaling server is running.');
 });
 
-// LiveKit token generation endpoint
+// In-memory queue for the Waiting Room feature
+// activeRooms[roomId] = { hostName: string, waiting: { reqId: { username, status, token } } }
+const activeRooms = {};
+
+const generateLiveKitToken = async (room, username) => {
+  const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
+  const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
+  const serverUrl = process.env.LIVEKIT_URL || 'ws://localhost:7800';
+
+  const safeUsername = username.replace(/[^a-zA-Z0-9_-]/g, '');
+  const uniqueIdentity = `${safeUsername}-${Math.random().toString(36).substring(2, 8)}`;
+  
+  const at = new AccessToken(apiKey, apiSecret, {
+    identity: uniqueIdentity,
+    name: username,
+  });
+  
+  at.addGrant({
+    roomJoin: true,
+    room: room,
+    canPublish: true,
+    canSubscribe: true,
+  });
+
+  const token = await at.toJwt();
+  return { token, serverUrl };
+};
+
+// 1. Host requests token instantly
 app.get('/api/token', async (req, res) => {
   try {
-    const { room, username } = req.query;
+    const { room, username, isHost } = req.query;
     if (!room || !username) {
       return res.status(400).json({ error: 'room and username are required' });
     }
 
-    const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
-    const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
-    const serverUrl = process.env.LIVEKIT_URL || 'ws://localhost:7800';
+    // Register room and host if isHost is true
+    if (isHost === 'true') {
+      if (!activeRooms[room]) {
+        activeRooms[room] = { hostName: username, waiting: {} };
+      } else {
+        activeRooms[room].hostName = username;
+      }
+    }
 
-    const at = new AccessToken(apiKey, apiSecret, {
-      identity: username,
-    });
-    
-    at.addGrant({
-      roomJoin: true,
-      room: room,
-      canPublish: true,
-      canSubscribe: true,
-    });
-
-    const token = await at.toJwt();
-    res.json({ token, serverUrl });
+    const credentials = await generateLiveKitToken(room, username);
+    res.json(credentials);
   } catch (error) {
     console.error('Error generating token:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Single port fallback wildcard router (serves index.html for SPA page refresh routing)
+// 2. Guest requests to join the waiting room
+app.post('/api/request-join', (req, res) => {
+  const { room, username } = req.body;
+  if (!room || !username) return res.status(400).json({ error: 'Missing params' });
+
+  // Initialize room if it doesn't exist
+  if (!activeRooms[room]) {
+    activeRooms[room] = { hostName: null, waiting: {} };
+  }
+
+  const reqId = `req_${Math.random().toString(36).substring(2, 9)}`;
+  activeRooms[room].waiting[reqId] = {
+    username,
+    status: 'pending',
+    token: null,
+    serverUrl: null
+  };
+
+  res.json({ reqId });
+});
+
+// 3. Guest polls their admission status
+app.get('/api/join-status', (req, res) => {
+  const { room, reqId } = req.query;
+  const roomData = activeRooms[room];
+  
+  if (!roomData || !roomData.waiting[reqId]) {
+    return res.status(404).json({ error: 'Request not found' });
+  }
+
+  const reqData = roomData.waiting[reqId];
+  res.json({
+    status: reqData.status,
+    token: reqData.token,
+    serverUrl: reqData.serverUrl
+  });
+});
+
+// 4. Host polls the waiting list for their room
+app.get('/api/waiting-list', (req, res) => {
+  const { room } = req.query;
+  const roomData = activeRooms[room];
+
+  if (!roomData) return res.json({ waiting: [] });
+
+  // Return only pending requests
+  const pendingRequests = Object.entries(roomData.waiting)
+    .filter(([_, data]) => data.status === 'pending')
+    .map(([id, data]) => ({ reqId: id, username: data.username }));
+
+  res.json({ waiting: pendingRequests });
+});
+
+// 5. Host admits or denies a request
+app.post('/api/handle-request', async (req, res) => {
+  try {
+    const { room, reqId, action } = req.body; // action = 'admit' | 'deny'
+    const roomData = activeRooms[room];
+
+    if (!roomData || !roomData.waiting[reqId]) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    if (action === 'admit') {
+      const username = roomData.waiting[reqId].username;
+      const credentials = await generateLiveKitToken(room, username);
+      
+      roomData.waiting[reqId].status = 'admitted';
+      roomData.waiting[reqId].token = credentials.token;
+      roomData.waiting[reqId].serverUrl = credentials.serverUrl;
+    } else if (action === 'deny') {
+      roomData.waiting[reqId].status = 'denied';
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error handling request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Single port fallback wildcard router
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path === '/health') {
     return next();
   }
   res.sendFile(path.join(__dirname, '../client/dist/index.html'), (err) => {
     if (err) {
-      res.status(404).send('Frontend client build is not found. Please run npm run build in the client first.');
+      res.status(404).send('Frontend client build is not found.');
     }
   });
 });
 
 const server = http.createServer(app);
 
-const io = new Server(server, {
-  cors: {
-    origin: '*', // Allow all origins for dev/local testing
-    methods: ['GET', 'POST']
-  }
-});
-
-// Map room IDs to list of active participants: { [roomId]: [ { socketId, userId, userName } ] }
-const rooms = {};
-
-// Map socket.id to user and room info for quick disconnect lookup
-const socketInfo = {};
-
-io.on('connection', (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
-
-  // 1. Join Room
-  socket.on('join-room', ({ roomId, userId, userName, micEnabled, videoEnabled }) => {
-    console.log(`User ${userName} (${userId}) joining room: ${roomId} with mic:${micEnabled}, video:${videoEnabled}`);
-    
-    // Add user to room tracking
-    if (!rooms[roomId]) {
-      rooms[roomId] = [];
-    }
-
-    const newUser = {
-      socketId: socket.id,
-      userId,
-      userName,
-      micEnabled: micEnabled !== undefined ? micEnabled : true,
-      videoEnabled: videoEnabled !== undefined ? videoEnabled : true
-    };
-
-    // Store socket info for disconnect lookup
-    socketInfo[socket.id] = { roomId, userId, userName };
-
-    // Get list of existing users in the room BEFORE we add the new user
-    const existingUsers = rooms[roomId].filter(user => user.socketId !== socket.id);
-
-    // Add new user to the room if not already present
-    if (!rooms[roomId].some(u => u.socketId === socket.id)) {
-      rooms[roomId].push(newUser);
-    }
-
-    // Join the socket.io channel
-    socket.join(roomId);
-
-    // Send the list of existing users to the newly joined user
-    socket.emit('all-users', existingUsers);
-
-    // Broadcast user-joined event to all other clients in the room
-    socket.to(roomId).emit('user-joined', newUser);
-  });
-
-  // 2. Relay WebRTC Signal (SDP offer/answer, ICE Candidate)
-  socket.on('relay-signal', ({ targetSocketId, signal }) => {
-    // Forward the signal to the target peer with the sender's socket ID
-    io.to(targetSocketId).emit('signal', {
-      senderSocketId: socket.id,
-      signal
-    });
-  });
-
-  // 3. Chat messages
-  socket.on('send-chat-message', ({ roomId, messageText, senderName }) => {
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    io.to(roomId).emit('receive-chat-message', {
-      senderId: socket.id,
-      senderName,
-      messageText,
-      timestamp
-    });
-  });
-
-  // 4. Mute/Camera toggle state sync
-  socket.on('toggle-media', ({ roomId, type, enabled }) => {
-    // Update stored state
-    if (rooms[roomId]) {
-      const user = rooms[roomId].find(u => u.socketId === socket.id);
-      if (user) {
-        if (type === 'audio') user.micEnabled = enabled;
-        if (type === 'video') user.videoEnabled = enabled;
-      }
-    }
-    socket.to(roomId).emit('user-media-toggled', {
-      socketId: socket.id,
-      type, // 'audio' or 'video'
-      enabled
-    });
-  });
-
-  // 5. Hand raise state sync
-  socket.on('raise-hand', ({ roomId, raised }) => {
-    socket.to(roomId).emit('user-hand-raised', {
-      socketId: socket.id,
-      raised
-    });
-  });
-
-  // 7. Emoji reactions relay
-  socket.on('send-reaction', ({ roomId, emoji, senderName }) => {
-    socket.to(roomId).emit('user-reacted', {
-      socketId: socket.id,
-      senderName,
-      emoji
-    });
-  });
-
-  // 8. Live captions relay
-  socket.on('send-caption', ({ roomId, text, senderName }) => {
-    socket.to(roomId).emit('user-captioned', {
-      socketId: socket.id,
-      senderName,
-      text
-    });
-  });
-
-  // 6. Handle socket disconnect
-  socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
-    const info = socketInfo[socket.id];
-    
-    if (info) {
-      const { roomId, userName } = info;
-      console.log(`User ${userName} leaving room: ${roomId}`);
-
-      // Remove user from room array
-      if (rooms[roomId]) {
-        rooms[roomId] = rooms[roomId].filter(user => user.socketId !== socket.id);
-        
-        // Clean up empty rooms
-        if (rooms[roomId].length === 0) {
-          delete rooms[roomId];
-        }
-      }
-
-      // Clean up socket info
-      delete socketInfo[socket.id];
-
-      // Notify others in room
-      socket.to(roomId).emit('user-left', { socketId: socket.id });
-    }
-  });
-});
-
-const PORT = process.env.PORT || 5050;
-server.listen(PORT, () => {
-  console.log(`Signaling server listening on port ${PORT}`);
+const PORT = process.env.PORT || 5052;
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Backend server listening on port ${PORT}`);
 });

@@ -96,34 +96,36 @@ export default function LandingPage({ user, onSignOut, onCreateRoom, onJoinRoom 
   };
 
   return (
-    <div className="landing-container">
+    <div className="min-h-screen">
       {/* App Header */}
-      <header className="landing-header">
+      <header className="app-header">
         <div className="logo-container">
-          <Video size={32} strokeWidth={2.5} className="logo-icon" />
-          <h1 className="logo-text">Google <span>Meet</span></h1>
+          <div className="bg-blue-600 p-2 rounded-lg">
+            <Video size={24} color="white" />
+          </div>
+          <h1 className="logo-text">Connect<span className="text-gradient">Meet</span></h1>
         </div>
         
-        <div className="header-right-side">
-          <div className="header-time">{currentTime}</div>
+        <div className="header-right">
+          <div className="time-display">{currentTime}</div>
           
           {/* User Profile Menu */}
-          <div className="user-profile-menu-container">
+          <div className="profile-menu-container">
             <button 
-              className="profile-avatar-btn" 
+              className="profile-btn" 
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              title="Google Account"
+              title="Account Options"
             >
               {user.avatar}
             </button>
             
             {showProfileMenu && (
-              <div className="profile-dropdown-menu">
-                <div className="dropdown-avatar-circle">{user.avatar}</div>
+              <div className="profile-dropdown glass-panel">
+                <div className="dropdown-avatar">{user.avatar}</div>
                 <h4>{user.name}</h4>
                 <p>{user.email}</p>
-                <button className="btn-signout" onClick={onSignOut}>
-                  Sign out of all accounts
+                <button className="btn-danger w-full" style={{ width: '100%' }} onClick={onSignOut}>
+                  Sign Out
                 </button>
               </div>
             )}
@@ -132,42 +134,42 @@ export default function LandingPage({ user, onSignOut, onCreateRoom, onJoinRoom 
       </header>
 
       {/* Main Content */}
-      <main className="landing-content">
-        <div className="landing-left">
+      <main className="hero-section">
+        <div className="hero-content">
           <h1>Premium video meetings.<br />Now free for everyone.</h1>
-          <p>We re-engineered the service we built for secure business meetings, Google Meet, to make it free and available on any device.</p>
+          <p>We engineered the service built for secure, high-performance business meetings, to make it accessible and incredibly fast on any device.</p>
           
-          <div className="action-row">
+          <div className="hero-actions">
             {/* New Meeting Dropdown Container */}
-            <div className="dropdown-wrapper">
+            <div className="action-dropdown-wrapper">
               <button 
                 className="btn-primary" 
                 onClick={() => setShowMeetDropdown(!showMeetDropdown)}
               >
                 <Video size={20} />
-                New meeting
+                New Meeting
               </button>
               
               {showMeetDropdown && (
-                <div className="btn-meet-dropdown">
-                  <button className="dropdown-action-item" onClick={handleCreateLater}>
+                <div className="action-menu glass-panel">
+                  <button className="action-item" onClick={handleCreateLater}>
                     <LinkIcon size={18} />
                     <span>Create a meeting for later</span>
                   </button>
-                  <button className="dropdown-action-item" onClick={handleStartInstant}>
+                  <button className="action-item" onClick={handleStartInstant}>
                     <Plus size={18} />
                     <span>Start an instant meeting</span>
                   </button>
-                  <button className="dropdown-action-item" onClick={() => { setShowCalendarModal(true); setShowMeetDropdown(false); }}>
+                  <button className="action-item" onClick={() => { setShowCalendarModal(true); setShowMeetDropdown(false); }}>
                     <Calendar size={18} />
-                    <span>Schedule in Google Calendar</span>
+                    <span>Schedule in Calendar</span>
                   </button>
                 </div>
               )}
             </div>
 
-            <form onSubmit={handleJoin} className="join-input-group">
-              <Keyboard size={18} className="input-icon" />
+            <form onSubmit={handleJoin} className="join-form">
+              <Keyboard size={18} />
               <input 
                 type="text" 
                 placeholder="Enter a code or link"
@@ -176,147 +178,127 @@ export default function LandingPage({ user, onSignOut, onCreateRoom, onJoinRoom 
               />
               <button 
                 type="submit" 
-                className="btn-text-join"
+                className="btn-join"
                 disabled={!roomCode.trim()}
               >
                 Join
               </button>
             </form>
           </div>
-          
-          <div style={{ marginTop: '40px', borderTop: '1px solid var(--border-light)', paddingTop: '24px' }}>
-            <span style={{ fontSize: '14px', color: 'var(--text-secondary-light)' }}>
-              <a href="#" style={{ color: 'var(--brand-blue)', textDecoration: 'none', fontWeight: '500' }}>Learn more</a> about Google Meet
-            </span>
-          </div>
         </div>
 
-        <div className="landing-right">
-          <div className="carousel-mock">
-            <div className="mock-shapes"></div>
-            <div className="mock-screen">
-              <div className="mock-video-tile">
-                <div className="mock-avatar">S</div>
-                <span className="mock-badge">Sarah (Host)</span>
+        <div className="hero-graphic">
+          <div className="floating-card glass-panel">
+            <div className="mock-video-area">
+              <div className="mock-avatar-pulse">
+                {user.avatar}
               </div>
-              <div className="mock-controls">
-                <div className="mock-dot active"></div>
-                <div className="mock-dot"></div>
-                <div className="mock-dot"></div>
-              </div>
+              <span className="mock-badge">{user.name} (You)</span>
             </div>
-          </div>
-          <div className="carousel-info">
-            <h3>Get a link you can share</h3>
-            <p>Click <strong>New meeting</strong> to get a link you can send to people you want to meet with</p>
+            <div className="mock-controls">
+              <div className="mock-btn active"></div>
+              <div className="mock-btn"></div>
+              <div className="mock-btn"></div>
+            </div>
           </div>
         </div>
       </main>
 
       {/* 1. Modal: Meeting for Later Link Display */}
       {showLaterModal && (
-        <>
-          <div className="modal-backdrop" onClick={() => setShowLaterModal(false)} />
-          <div className="calendar-invite-modal">
+        <div className="modal-overlay" onClick={() => setShowLaterModal(false)}>
+          <div className="modal-content glass-panel" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Here's the link to your meeting</h3>
               <button className="btn-icon-sm" onClick={() => setShowLaterModal(false)}>
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
-            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary-light)', lineHeight: '18px', marginBottom: '16px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.5' }}>
               Copy this link and send it to people you want to meet with. Make sure you save it so you can use it later.
             </p>
-            <div className="copy-box" style={{ background: '#f1f3f4', color: '#202124' }}>
-              <span>{`${window.location.origin}/join/${laterRoomCode}`}</span>
+            <div className="copy-box">
+              <span className="copy-text">{`${window.location.origin}/join/${laterRoomCode}`}</span>
               <button 
-                className="copy-btn" 
+                className="btn-icon-sm" 
                 onClick={() => handleCopyLink(`${window.location.origin}/join/${laterRoomCode}`, setCopiedLater)}
               >
-                {copiedLater ? <Check size={16} style={{ color: 'var(--brand-green)' }} /> : <Copy size={16} />}
+                {copiedLater ? <Check size={18} color="var(--brand-green)" /> : <Copy size={18} />}
               </button>
             </div>
             <button 
               className="btn-primary" 
-              style={{ width: '100%', marginTop: '20px' }}
-              onClick={() => onJoinRoom(laterRoomCode)}
+              style={{ width: '100%', marginTop: '24px' }}
+              onClick={() => onCreateRoom(laterRoomCode)}
             >
               Join now
             </button>
           </div>
-        </>
+        </div>
       )}
 
-      {/* 2. Modal: Schedule in Google Calendar */}
+      {/* 2. Modal: Schedule in Calendar */}
       {showCalendarModal && (
-        <>
-          <div className="modal-backdrop" onClick={() => { setShowCalendarModal(false); setScheduledDetails(null); }} />
-          <div className="calendar-invite-modal">
+        <div className="modal-overlay" onClick={() => { setShowCalendarModal(false); setScheduledDetails(null); }}>
+          <div className="modal-content glass-panel" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Schedule in Google Calendar</h3>
+              <h3>Schedule Meeting</h3>
               <button className="btn-icon-sm" onClick={() => { setShowCalendarModal(false); setScheduledDetails(null); }}>
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
             
             {!scheduledDetails ? (
-              <form onSubmit={handleScheduleSubmit} className="modal-body-form">
-                <div className="form-group">
-                  <label style={{ color: 'var(--text-secondary-light)' }}>Meeting Topic / Title</label>
+              <form onSubmit={handleScheduleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px' }}>Topic</label>
                   <input 
                     type="text" 
                     value={calTitle}
                     onChange={(e) => setCalTitle(e.target.value)}
                     required
-                    style={{ border: '1px solid var(--border-light)', color: '#202124', background: 'white' }}
+                    style={{ width: '100%', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: 'white' }}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="form-group">
-                    <label style={{ color: 'var(--text-secondary-light)' }}>Date</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px' }}>Date</label>
                     <input 
                       type="date" 
                       value={calDate}
                       onChange={(e) => setCalDate(e.target.value)}
                       required
-                      style={{ border: '1px solid var(--border-light)', color: '#202124', background: 'white' }}
+                      style={{ width: '100%', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: 'white', colorScheme: 'dark' }}
                     />
                   </div>
-                  <div className="form-group">
-                    <label style={{ color: 'var(--text-secondary-light)' }}>Time</label>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '14px' }}>Time</label>
                     <input 
                       type="time" 
                       value={calTime}
                       onChange={(e) => setCalTime(e.target.value)}
                       required
-                      style={{ border: '1px solid var(--border-light)', color: '#202124', background: 'white' }}
+                      style={{ width: '100%', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-glass)', borderRadius: '8px', color: 'white', colorScheme: 'dark' }}
                     />
                   </div>
                 </div>
-                <button type="submit" className="btn-primary" style={{ marginTop: '12px' }}>
+                <button type="submit" className="btn-primary" style={{ marginTop: '8px', width: '100%' }}>
                   Schedule Meeting
                 </button>
               </form>
             ) : (
               <div>
-                <p style={{ fontSize: '13.5px', color: 'var(--text-secondary-light)', marginBottom: '16px' }}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
                   Meeting scheduled successfully! Send these invitation details to your guests:
                 </p>
-                <pre style={{ 
-                  background: '#f1f3f4', 
-                  color: '#202124', 
-                  padding: '12px', 
-                  borderRadius: '6px', 
-                  fontSize: '12px', 
-                  fontFamily: 'monospace',
-                  whiteSpace: 'pre-wrap',
-                  lineHeight: '16px'
-                }}>
-                  {scheduledDetails}
-                </pre>
-                <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                <div style={{ background: 'var(--bg-input)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+                  <pre style={{ color: 'var(--brand-primary)', fontSize: '13px', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                    {scheduledDetails}
+                  </pre>
+                </div>
+                <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
                   <button 
-                    className="btn-signout"
+                    className="btn-secondary"
                     style={{ flex: 1 }}
                     onClick={() => handleCopyLink(scheduledDetails, () => {})}
                   >
@@ -327,7 +309,7 @@ export default function LandingPage({ user, onSignOut, onCreateRoom, onJoinRoom 
                     style={{ flex: 1 }}
                     onClick={() => {
                       const code = scheduledDetails.split('Meeting Link: ')[1].split('/join/')[1].trim();
-                      onJoinRoom(code);
+                      onCreateRoom(code);
                     }}
                   >
                     Join Room
@@ -336,7 +318,7 @@ export default function LandingPage({ user, onSignOut, onCreateRoom, onJoinRoom 
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

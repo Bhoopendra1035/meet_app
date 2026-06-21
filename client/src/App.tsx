@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
-import Lobby from './components/Lobby';
 import MeetingRoom from './components/MeetingRoom';
+import AuthPage from './components/AuthPage';
 
 export interface UserSession {
   name: string;
@@ -10,88 +10,108 @@ export interface UserSession {
 }
 
 export default function App() {
-  const [user, setUser] = useState<UserSession>(() => ({
-    name: 'Google Guest',
-    email: 'guest.meet@google.com',
-    avatar: 'G'
-  }));
-
-  const [page, setPage] = useState<'landing' | 'lobby' | 'room'>('landing');
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [page, setPage] = useState<'auth' | 'landing' | 'room'>('auth');
   const [roomId, setRoomId] = useState<string>('');
-  const [userId] = useState<string>(() => 'user-' + Math.random().toString(36).substring(2, 11));
-  const [userName, setUserName] = useState<string>('');
-  
-  const [initialStream, setInitialStream] = useState<MediaStream | null>(null);
-  const [initialMic, setInitialMic] = useState<boolean>(true);
-  const [initialVideo, setInitialVideo] = useState<boolean>(true);
-  const [initialEffect, setInitialEffect] = useState<string>('none');
+  const [isHost, setIsHost] = useState<boolean>(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
+  // 1. Initialize Authentication from LocalStorage
   useEffect(() => {
+    const storedSession = localStorage.getItem('meet_user_session');
+    if (storedSession) {
+      setUser(JSON.parse(storedSession));
+    }
+    setIsInitializing(false);
+  }, []);
+
+  // 2. Handle Routing based on Auth State and URL
+  useEffect(() => {
+    if (isInitializing) return;
+
+    if (!user) {
+      setPage('auth');
+      return;
+    }
+
     const path = window.location.pathname;
     let potentialRoomId = path.replace(/^\/join\//, '').replace(/^\//, '');
     
     if (potentialRoomId && potentialRoomId.length >= 3) {
       potentialRoomId = potentialRoomId.split('/')[0];
       setRoomId(potentialRoomId);
-      setPage('lobby');
+      
+      // Check if this user is the host for this room from localStorage
+      const hostedRooms = JSON.parse(localStorage.getItem('hosted_rooms') || '[]');
+      if (hostedRooms.includes(potentialRoomId)) {
+        setIsHost(true);
+      } else {
+        setIsHost(false);
+      }
+      
+      setPage('room');
+    } else {
+      setPage('landing');
     }
-  }, []);
+  }, [user, isInitializing]);
+
+  const handleSignIn = (session: UserSession) => {
+    setUser(session);
+  };
 
   const handleCreateRoom = (newRoomId: string) => {
     setRoomId(newRoomId);
+    setIsHost(true);
+    
+    // Save to hosted rooms list
+    const hostedRooms = JSON.parse(localStorage.getItem('hosted_rooms') || '[]');
+    if (!hostedRooms.includes(newRoomId)) {
+      hostedRooms.push(newRoomId);
+      localStorage.setItem('hosted_rooms', JSON.stringify(hostedRooms));
+    }
+
     window.history.pushState({}, '', `/join/${newRoomId}`);
-    setPage('lobby');
+    setPage('room');
   };
 
   const handleJoinRoom = (targetRoomId: string) => {
     setRoomId(targetRoomId);
-    window.history.pushState({}, '', `/join/${targetRoomId}`);
-    setPage('lobby');
-  };
+    
+    // Even if they click join, check if they are the original host
+    const hostedRooms = JSON.parse(localStorage.getItem('hosted_rooms') || '[]');
+    setIsHost(hostedRooms.includes(targetRoomId));
 
-  const handleJoinLobby = ({ 
-    userName: name, 
-    localStream, 
-    micEnabled, 
-    videoEnabled,
-    videoEffect
-  }: { 
-    userName: string; 
-    localStream: MediaStream | null; 
-    micEnabled: boolean; 
-    videoEnabled: boolean; 
-    videoEffect: string;
-  }) => {
-    setUserName(name);
-    setInitialStream(localStream);
-    setInitialMic(micEnabled);
-    setInitialVideo(videoEnabled);
-    setInitialEffect(videoEffect);
+    window.history.pushState({}, '', `/join/${targetRoomId}`);
     setPage('room');
   };
 
   const handleLeaveRoom = () => {
     setPage('landing');
     setRoomId('');
-    setInitialStream(null);
+    setIsHost(false);
     window.history.pushState({}, '', '/');
   };
 
   const handleSignOut = () => {
-    setUser({
-      name: 'Google Guest',
-      email: 'guest.meet@google.com',
-      avatar: 'G'
-    });
-    setPage('landing');
+    localStorage.removeItem('meet_user_session');
+    setUser(null);
+    setPage('auth');
     setRoomId('');
-    setInitialStream(null);
+    setIsHost(false);
     window.history.pushState({}, '', '/');
   };
 
+  if (isInitializing) {
+    return <div className="min-h-screen bg-zinc-900 flex items-center justify-center text-white">Loading...</div>;
+  }
+
   return (
     <>
-      {page === 'landing' && (
+      {page === 'auth' && (
+        <AuthPage onSignIn={handleSignIn} />
+      )}
+
+      {page === 'landing' && user && (
         <LandingPage 
           user={user}
           onSignOut={handleSignOut}
@@ -100,23 +120,11 @@ export default function App() {
         />
       )}
 
-      {page === 'lobby' && (
-        <Lobby 
-          roomId={roomId} 
-          user={user}
-          onJoin={handleJoinLobby} 
-        />
-      )}
-
-      {page === 'room' && (
+      {page === 'room' && user && (
         <MeetingRoom 
           roomId={roomId} 
-          userId={userId} 
-          userName={userName} 
-          initialStream={initialStream} 
-          initialMic={initialMic} 
-          initialVideo={initialVideo} 
-          initialEffect={initialEffect}
+          user={user}
+          isHost={isHost}
           onLeave={handleLeaveRoom}
         />
       )}
