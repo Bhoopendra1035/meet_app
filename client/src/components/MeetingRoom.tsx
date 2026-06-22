@@ -237,6 +237,8 @@ export default function MeetingRoom({ roomId, user, isHost, onLeave }: MeetingRo
         <ParticipantsSidebar 
           isOpen={showParticipants} 
           onClose={() => setShowParticipants(false)} 
+          isHost={isHost}
+          roomId={roomId}
         />
       </LiveKitRoom>
     </div>

@@ -1,13 +1,61 @@
 import { useParticipants } from '@livekit/components-react';
-import { Mic, MicOff, Video, VideoOff, X, User } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, X, User, UserMinus, MonitorPlay, MonitorX } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  isHost?: boolean;
+  roomId?: string;
 }
 
-export default function ParticipantsSidebar({ isOpen, onClose }: Props) {
+export default function ParticipantsSidebar({ isOpen, onClose, isHost, roomId }: Props) {
   const participants = useParticipants();
+
+  const handleKick = async (identity: string) => {
+    if (!roomId) return;
+    try {
+      await fetch('/api/host/kick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room: roomId, identity })
+      });
+    } catch (err) { console.error(err); }
+  };
+
+  const handleMuteAll = async () => {
+    if (!roomId) return;
+    try {
+      await fetch('/api/host/mute-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room: roomId })
+      });
+    } catch (err) { console.error(err); }
+  };
+
+  const handleMuteUser = async (identity: string) => {
+    if (!roomId) return;
+    try {
+      await fetch('/api/host/mute-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room: roomId, identity })
+      });
+    } catch (err) { console.error(err); }
+  };
+
+  // We toggle screen share permission by passing a boolean. 
+  // For simplicity, we can pass a boolean to grant/revoke. We assume revocation by default if not granted explicitly here.
+  const handleToggleScreenShare = async (identity: string, grant: boolean) => {
+    if (!roomId) return;
+    try {
+      await fetch('/api/host/permissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room: roomId, identity, canScreenShare: grant })
+      });
+    } catch (err) { console.error(err); }
+  };
 
   if (!isOpen) return null;
 
@@ -65,6 +113,18 @@ export default function ParticipantsSidebar({ isOpen, onClose }: Props) {
           <X size={16} />
         </button>
       </div>
+
+      {isHost && (
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+          <button 
+            onClick={handleMuteAll}
+            className="btn-danger" 
+            style={{ width: '100%', padding: '10px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            <MicOff size={16} /> Mute All
+          </button>
+        </div>
+      )}
 
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
@@ -136,6 +196,39 @@ export default function ParticipantsSidebar({ isOpen, onClose }: Props) {
                 }}>
                   {isCamOn ? <Video size={16} /> : <VideoOff size={16} />}
                 </div>
+                
+                {isHost && !p.isLocal && (
+                  <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                    <button
+                      onClick={() => handleMuteUser(p.identity)}
+                      title="Mute User"
+                      style={{ background: 'rgba(255, 107, 107, 0.1)', color: '#FF6B6B', border: 'none', padding: '6px', borderRadius: '50%', cursor: 'pointer' }}
+                    >
+                      <MicOff size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleToggleScreenShare(p.identity, true)}
+                      title="Grant Screen Share"
+                      style={{ background: 'rgba(79, 172, 254, 0.1)', color: '#4facfe', border: 'none', padding: '6px', borderRadius: '50%', cursor: 'pointer' }}
+                    >
+                      <MonitorPlay size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleToggleScreenShare(p.identity, false)}
+                      title="Revoke Screen Share"
+                      style={{ background: 'rgba(255, 107, 107, 0.1)', color: '#FF6B6B', border: 'none', padding: '6px', borderRadius: '50%', cursor: 'pointer' }}
+                    >
+                      <MonitorX size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleKick(p.identity)}
+                      title="Remove Participant"
+                      style={{ background: 'rgba(255, 107, 107, 0.1)', color: '#FF6B6B', border: 'none', padding: '6px', borderRadius: '50%', cursor: 'pointer' }}
+                    >
+                      <UserMinus size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
 
             </div>

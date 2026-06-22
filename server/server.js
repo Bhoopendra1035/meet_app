@@ -3,7 +3,14 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
-const { AccessToken } = require('livekit-server-sdk');
+const { AccessToken, RoomServiceClient, TrackSource } = require('livekit-server-sdk');
+
+const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
+const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
+const livekitHost = process.env.LIVEKIT_URL || 'ws://localhost:7800';
+const httpUrl = livekitHost.replace('ws://', 'http://').replace('wss://', 'https://');
+
+const roomService = new RoomServiceClient(httpUrl, apiKey, apiSecret);
 
 const app = express();
 app.use(cors());
@@ -22,11 +29,7 @@ app.get('/health', (req, res) => {
 // activeRooms[roomId] = { hostName: string, waiting: { reqId: { username, status, token } } }
 const activeRooms = {};
 
-const generateLiveKitToken = async (room, username) => {
-  const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
-  const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
-  const serverUrl = process.env.LIVEKIT_URL || 'ws://localhost:7800';
-
+const generateLiveKitToken = async (room, username, isHost) => {
   const safeUsername = username.replace(/[^a-zA-Z0-9_-]/g, '');
   const uniqueIdentity = `${safeUsername}-${Math.random().toString(36).substring(2, 8)}`;
   
@@ -41,10 +44,11 @@ const generateLiveKitToken = async (room, username) => {
     canPublish: true,
     canSubscribe: true,
     canPublishData: true,
+    canPublishSources: isHost ? [TrackSource.CAMERA, TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO] : [TrackSource.CAMERA, TrackSource.MICROPHONE],
   });
 
   const token = await at.toJwt();
-  return { token, serverUrl };
+  return { token, serverUrl: livekitHost };
 };
 
 // 1. Host requests token instantly
@@ -55,8 +59,10 @@ app.get('/api/token', async (req, res) => {
       return res.status(400).json({ error: 'room and username are required' });
     }
 
+    const isHostBool = isHost === 'true';
+
     // Register room and host if isHost is true
-    if (isHost === 'true') {
+    if (isHostBool) {
       if (!activeRooms[room]) {
         activeRooms[room] = { hostName: username, waiting: {} };
       } else {
@@ -64,7 +70,7 @@ app.get('/api/token', async (req, res) => {
       }
     }
 
-    const credentials = await generateLiveKitToken(room, username);
+    const credentials = await generateLiveKitToken(room, username, isHostBool);
     res.json(credentials);
   } catch (error) {
     console.error('Error generating token:', error);
@@ -137,7 +143,7 @@ app.post('/api/handle-request', async (req, res) => {
 
     if (action === 'admit') {
       const username = roomData.waiting[reqId].username;
-      const credentials = await generateLiveKitToken(room, username);
+      const credentials = await generateLiveKitToken(room, username, false);
       
       roomData.waiting[reqId].status = 'admitted';
       roomData.waiting[reqId].token = credentials.token;
@@ -149,6 +155,89 @@ app.post('/api/handle-request', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error handling request:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 6. Host endpoints for meeting controls
+app.post('/api/host/mute-all', async (req, res) => {
+  try {
+    const { room, trackSid } = req.body;
+    if (!room) return res.status(400).json({ error: 'room is required' });
+
+    // Iterate through participants to mute them
+    const participants = await roomService.listParticipants(room);
+    for (const p of participants) {
+      for (const track of p.tracks) {
+        if (trackSid) {
+            if (track.sid === trackSid) {
+                await roomService.mutePublishedTrack(room, p.identity, track.sid, true);
+            }
+        } else {
+            // Mute all tracks if no specific trackSid is provided
+            if (track.source === TrackSource.CAMERA || track.source === TrackSource.MICROPHONE) {
+              await roomService.mutePublishedTrack(room, p.identity, track.sid, true);
+            }
+        }
+      }
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error muting all:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/host/mute-user', async (req, res) => {
+  try {
+    const { room, identity } = req.body;
+    if (!room || !identity) return res.status(400).json({ error: 'room and identity required' });
+
+    const p = await roomService.getParticipant(room, identity);
+    for (const track of p.tracks) {
+      if (track.source === TrackSource.CAMERA || track.source === TrackSource.MICROPHONE) {
+        await roomService.mutePublishedTrack(room, identity, track.sid, true);
+      }
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error muting user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/host/kick', async (req, res) => {
+  try {
+    const { room, identity } = req.body;
+    if (!room || !identity) return res.status(400).json({ error: 'room and identity required' });
+
+    await roomService.removeParticipant(room, identity);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error kicking participant:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/host/permissions', async (req, res) => {
+  try {
+    const { room, identity, canScreenShare } = req.body;
+    if (!room || !identity) return res.status(400).json({ error: 'room and identity required' });
+
+    // Fetch current participant to get existing grants if needed
+    // The LiveKit SDK updateParticipant requires providing all flags or it might override them.
+    
+    await roomService.updateParticipant(room, identity, undefined, {
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+      canPublishSources: canScreenShare ? [TrackSource.CAMERA, TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO] : [TrackSource.CAMERA, TrackSource.MICROPHONE]
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating permissions:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
