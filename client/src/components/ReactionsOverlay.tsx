@@ -13,9 +13,16 @@ interface HandRaise {
   timestamp: number;
 }
 
+interface ScreenShareRequest {
+  identity: string;
+  name: string;
+  timestamp: number;
+}
+
 export default function ReactionsOverlay() {
   const [emojis, setEmojis] = useState<FloatingEmoji[]>([]);
   const [handRaises, setHandRaises] = useState<HandRaise[]>([]);
+  const [screenShareRequests, setScreenShareRequests] = useState<ScreenShareRequest[]>([]);
 
   const handleMessage = useCallback((msg: any) => {
     try {
@@ -46,6 +53,17 @@ export default function ReactionsOverlay() {
         } else {
           setHandRaises((prev) => prev.filter(h => h.identity !== data.identity));
         }
+      } else if (data.type === 'request_screen_share') {
+        setScreenShareRequests((prev) => {
+          const exists = prev.find(r => r.identity === data.identity);
+          if (exists) return prev;
+          return [...prev, { identity: data.identity, name: data.user, timestamp: Date.now() }];
+        });
+        
+        // Auto dismiss request toast after 8 seconds
+        setTimeout(() => {
+          setScreenShareRequests((prev) => prev.filter(r => r.identity !== data.identity));
+        }, 8000);
       }
     } catch (err) {
       console.error('Failed to parse data channel message', err);
@@ -119,6 +137,59 @@ export default function ReactionsOverlay() {
             <span style={{ fontSize: '15px' }}>
               <strong style={{ color: '#4facfe' }}>{h.name}</strong> raised hand
             </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Screen Share Requests */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '120px', 
+        right: '24px', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '12px',
+        alignItems: 'flex-end'
+      }}>
+        {screenShareRequests.map((r) => (
+          <div 
+            key={r.identity} 
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(30,30,40,0.9), rgba(20,20,25,0.95))', 
+              color: 'white', 
+              padding: '12px 20px', 
+              borderRadius: '16px', 
+              fontWeight: 500, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              animation: 'slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              border: '1px solid rgba(255, 171, 0, 0.3)',
+              borderLeft: '4px solid #FFAB00',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(10px)'
+            }}
+          >
+            <div style={{
+              background: 'rgba(255, 171, 0, 0.2)',
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px'
+            }}>
+              🖥️
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '15px' }}>
+                <strong style={{ color: '#FFAB00' }}>{r.name}</strong> requested screen share
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Open Participants sidebar to grant
+              </span>
+            </div>
           </div>
         ))}
       </div>

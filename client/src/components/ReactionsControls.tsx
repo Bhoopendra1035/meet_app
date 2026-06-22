@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDataChannel, useLocalParticipant } from '@livekit/components-react';
-import { SmilePlus, Hand, Users } from 'lucide-react';
+import { SmilePlus, Hand, Users, MonitorUp } from 'lucide-react';
 
 interface Props {
   showParticipants: boolean;
@@ -47,6 +47,25 @@ export default function ReactionsControls({ showParticipants, onToggleParticipan
       console.error('Failed to send hand raise', err);
     }
   }, [send, localParticipant, handRaised]);
+
+  const requestScreenShare = useCallback(() => {
+    try {
+      const payload = JSON.stringify({
+        type: 'request_screen_share',
+        user: localParticipant.name || localParticipant.identity,
+        identity: localParticipant.identity
+      });
+      const encoder = new TextEncoder();
+      send(encoder.encode(payload), { reliable: true });
+      // Optionally show a local success toast here, but for simplicity we just send it.
+    } catch (err) {
+      console.error('Failed to request screen share', err);
+    }
+  }, [send, localParticipant]);
+
+  // Check if we currently have screen share permission. If we do, we don't necessarily need the request button, 
+  // but we'll show it anyway or we can hide it. Let's hide it if we can already share.
+  const canShareScreen = localParticipant.permissions?.canPublishSources?.includes('screen_share') ?? false;
 
   return (
     <div style={{ 
@@ -156,6 +175,31 @@ export default function ReactionsControls({ showParticipants, onToggleParticipan
       >
         <Hand size={22} />
       </button>
+
+      {/* Request Screen Share (Only if user doesn't already have permission) */}
+      {!canShareScreen && (
+        <button 
+          onClick={requestScreenShare}
+          style={{ 
+            background: 'transparent', 
+            color: 'rgba(255,255,255,0.8)',
+            border: 'none',
+            borderRadius: '50%',
+            width: '44px',
+            height: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+          title="Request Screen Share"
+        >
+          <MonitorUp size={22} />
+        </button>
+      )}
 
       {/* Participants */}
       <button 
