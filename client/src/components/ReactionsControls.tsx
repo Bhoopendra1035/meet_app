@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDataChannel, useLocalParticipant } from '@livekit/components-react';
+import { Track } from 'livekit-client';
 import { SmilePlus, Hand, Users, MonitorUp } from 'lucide-react';
 
 interface Props {
@@ -65,7 +66,7 @@ export default function ReactionsControls({ showParticipants, onToggleParticipan
 
   // Check if we currently have screen share permission. If we do, we don't necessarily need the request button, 
   // but we'll show it anyway or we can hide it. Let's hide it if we can already share.
-  const canShareScreen = localParticipant.permissions?.canPublishSources?.includes('screen_share') ?? false;
+  const canShareScreen = (localParticipant.permissions?.canPublishSources as any[])?.some(s => s === 'screen_share' || s === 3 || s === Track.Source.ScreenShare) ?? false;
 
   return (
     <div style={{ 
