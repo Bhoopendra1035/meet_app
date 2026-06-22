@@ -207,10 +207,13 @@ export default function MeetingRoom({ roomId, user, isHost, onLeave }: MeetingRo
       )}
 
       {error && (
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10000, background: 'rgba(0,0,0,0.9)', padding: '20px', borderRadius: '10px', color: 'white', textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--brand-red)' }}>Connection Error</h2>
-          <p>{error}</p>
-          <button onClick={onLeave} className="btn-danger">Go Back</button>
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10000, background: 'rgba(20,20,25,0.95)', padding: '30px', borderRadius: '16px', color: 'white', textAlign: 'center', border: '1px solid rgba(255,107,107,0.3)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+          <h2 style={{ color: 'var(--brand-red)', marginBottom: '16px' }}>Notice</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '24px', maxWidth: '300px' }}>{error}</p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button onClick={() => setError('')} className="btn-primary">Dismiss</button>
+            <button onClick={onLeave} className="btn-danger">Leave</button>
+          </div>
         </div>
       )}
 
